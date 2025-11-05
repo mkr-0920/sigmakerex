@@ -4,12 +4,12 @@
 // Settings container
 struct SETTINGS
 {
-	#define SETTINGS_FILENAME "SigMakerEx.cfg"
+#define SETTINGS_FILENAME "SigMakerEx.cfg"
 
 	UINT32 version;	// Plugin version
 
 	// Function signature creation criteria
-	enum FUNC_CRITERIA: int
+	enum FUNC_CRITERIA : int
 	{
 		FUNC_ENTRY_POINT,	// Function entry point
 		FUNC_MIN_SIZE,		// By minimal byte size
@@ -17,19 +17,19 @@ struct SETTINGS
 	};
 	FUNC_CRITERIA funcCriteria;
 
-	enum OUTPUT_FORMAT: int
+	enum OUTPUT_FORMAT : int
 	{
 		OF_IDA,		// IDA and others "AB 78 E8 ?? ?? ?? ?? CC" style spaced bytes with double "??" wildcard
 		OF_IDA2,    // "" but with a single '?' wildcard char
 		OF_CODE,	// Escape encoded binary with ASCII mask "code" style in two strings.
-					// E.g. "\x33\x9A\xFA\x00\x00\x00\x00\x45\x68", "xxxxxxx????xx"
+		// E.g. "\x33\x9A\xFA\x00\x00\x00\x00\x45\x68", "xxxxxxx????xx"
 		OF_INLINE,	// Like "code" style, but byte string with inlined bytes w/wildcard
-					// E.g. "{0x33,0x9A,0xFA,0xAE,0xAE,0xAE,0xAE,0x45,0x68}", where 0xAE is the wildcard bytes.
+		// E.g. "{0x33,0x9A,0xFA,0xAE,0xAE,0xAE,0xAE,0x45,0x68}", where 0xAE is the wildcard bytes.
 	};
 	OUTPUT_FORMAT outputFormat;
 
 	// IDA message output log level
-	enum OUTPUTLEVEL: int
+	enum OUTPUTLEVEL : int
 	{
 		LL_TERSE,    // Minimal/normal output
 		LL_VERBOSE   // Verbose for monitoring and troubleshooting
@@ -47,17 +47,26 @@ struct SETTINGS
 	// Byte mask/wildcard byte for the "inline" output format
 	BYTE maskByte;
 
-	SETTINGS() { Default();	};
+	// "At Address" search direction
+	enum SEARCH_DIRECTION : int
+	{
+		SD_DOWNWARDS,	// 0 = Default
+		SD_UPWARDS,		// 1
+	};
+	SEARCH_DIRECTION searchDirection;
+
+	SETTINGS() { Default(); };
 
 	void Default()
 	{
 		version = MY_VERSION;
 		funcCriteria = SETTINGS::FUNC_ENTRY_POINT;
 		outputFormat = SETTINGS::OF_IDA;
-		outputLevel  = SETTINGS::LL_TERSE;
+		outputLevel = SETTINGS::LL_TERSE;
 		maxScanRefCount = 0;
 		maxEntryPointBytes = 0;
 		maskByte = 0xAE; // Default, one of the least common code byte frequency values
+		searchDirection = SETTINGS::SD_DOWNWARDS; // 默认向下查找
 	}
 
 	template <class T> void CLAMP(T& x, T min, T max) { if (x < min) x = min; else if (x > max) x = max; }
@@ -67,13 +76,14 @@ struct SETTINGS
 		CLAMP(funcCriteria, SETTINGS::FUNC_ENTRY_POINT, SETTINGS::FUNC_FULL);
 		CLAMP(outputFormat, SETTINGS::OF_IDA, SETTINGS::OF_INLINE);
 		CLAMP(outputLevel, SETTINGS::LL_TERSE, SETTINGS::LL_VERBOSE);
+		CLAMP(searchDirection, SETTINGS::SD_DOWNWARDS, SETTINGS::SD_UPWARDS);
 	}
 
 	void Save()
 	{
 		char path[MAXSTR];
 		qsnprintf(path, MAXSTR - 1, "%s\\%s", get_user_idadir(), SETTINGS_FILENAME);
-		FILE *fp = qfopen(path, "wb");
+		FILE* fp = qfopen(path, "wb");
 		if (fp)
 		{
 			Validate();
@@ -90,7 +100,7 @@ struct SETTINGS
 		{
 			char path[MAXSTR];
 			qsnprintf(path, MAXSTR - 1, "%s\\%s", get_user_idadir(), SETTINGS_FILENAME);
-			FILE *fp = qfopen(path, "rb");
+			FILE* fp = qfopen(path, "rb");
 			if (fp)
 			{
 				qfread(fp, this, sizeof(SETTINGS));

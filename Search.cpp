@@ -1,4 +1,4 @@
-﻿
+
 // Search for binary signature pattern support
 #include "SigMaker.h"
 
@@ -18,11 +18,11 @@ struct SearchData
 	{
 		if (!buffer)
 		{
-			LOG_VERBOSE(__FUNCTION__ ": min_ea: 0x%llX, max_ea: 0x%llX, size: 0x%llX\n\n", (UINT64) inf_get_min_ea(), (UINT64) inf_get_max_ea(), (UINT64) (inf_get_max_ea() - inf_get_min_ea()));
+			LOG_VERBOSE(__FUNCTION__ ": min_ea: 0x%llX, max_ea: 0x%llX, size: 0x%llX\n\n", (UINT64)inf_get_min_ea(), (UINT64)inf_get_max_ea(), (UINT64)(inf_get_max_ea() - inf_get_min_ea()));
 
 			// Allocate page buffer to encompass the whole the IDB region
-			size = (UINT64) (inf_get_max_ea() - inf_get_min_ea());
-			buffer = (PBYTE) VirtualAlloc(NULL, size + 32, (MEM_COMMIT | MEM_RESERVE), PAGE_READWRITE);
+			size = (UINT64)(inf_get_max_ea() - inf_get_min_ea());
+			buffer = (PBYTE)VirtualAlloc(NULL, size + 32, (MEM_COMMIT | MEM_RESERVE), PAGE_READWRITE);
 			if (buffer)
 			{
 				// Copy the IDB bytes to the buffer
@@ -34,7 +34,7 @@ struct SearchData
 
 				do
 				{
-					*ptr = (BYTE) get_db_byte(currentEa);
+					*ptr = (BYTE)get_db_byte(currentEa);
 					++currentEa, ++ptr, --count;
 
 				} while (count);
@@ -106,7 +106,7 @@ static inline UINT32 get_first_bit_set(UINT32 x)
 	// Generates a single BSF instruction
 	unsigned long ret;
 	_BitScanForward(&ret, x);
-	return (UINT32) ret;
+	return (UINT32)ret;
 }
 
 static inline UINT32 clear_leftmost_set(UINT32 value)
@@ -117,7 +117,7 @@ static inline UINT32 clear_leftmost_set(UINT32 value)
 
 // Like memcmp() but takes a 3rd 'mask' argument
 // Note: Tried optimizing, has little effect on cumulative scan speed
-int memcmp_mask(const BYTE *buffer1, const BYTE *buffer2, const BYTE *mask2, size_t count)
+int memcmp_mask(const BYTE* buffer1, const BYTE* buffer2, const BYTE* mask2, size_t count)
 {
 	while (count--)
 	{
@@ -133,9 +133,9 @@ int memcmp_mask(const BYTE *buffer1, const BYTE *buffer2, const BYTE *mask2, siz
 }
 
 // Find signature pattern in memory
-PBYTE FindSignatureAVX2(PBYTE data, size_t size, const SIG &sig, BOOL hasWildcards)
+PBYTE FindSignatureAVX2(PBYTE data, size_t size, const SIG& sig, BOOL hasWildcards)
 {
-	const BYTE *pat = sig.bytes.data();
+	const BYTE* pat = sig.bytes.data();
 	size_t patLen = sig.bytes.size();
 	size_t patLen1 = (patLen - 1);
 	size_t patLen2 = (patLen - 2);
@@ -144,7 +144,7 @@ PBYTE FindSignatureAVX2(PBYTE data, size_t size, const SIG &sig, BOOL hasWildcar
 	const __m256i first = _mm256_set1_epi8(pat[0]);
 	const __m256i last = _mm256_set1_epi8(pat[patLen1]);
 
-	if(!hasWildcards)
+	if (!hasWildcards)
 	{
 		// A little faster without wildcards
 
@@ -178,7 +178,7 @@ PBYTE FindSignatureAVX2(PBYTE data, size_t size, const SIG &sig, BOOL hasWildcar
 	else
 	{
 		// Pattern scan with wildcards mask
-		const BYTE *msk = sig.mask.data();
+		const BYTE* msk = sig.mask.data();
 
 		for (size_t i = 0; i < size; i += 32)
 		{
@@ -211,13 +211,13 @@ PBYTE FindSignatureAVX2(PBYTE data, size_t size, const SIG &sig, BOOL hasWildcar
 
 // Find signature pattern in memory
 // Base memory search reference, about 10x slower than the AVX2 version
-PBYTE FindSignature(PBYTE input, size_t inputLen, const SIG &sig, BOOL hasWildcards)
+PBYTE FindSignature(PBYTE input, size_t inputLen, const SIG& sig, BOOL hasWildcards)
 {
 	if (!hasWildcards)
 	{
 		// If no wildcards, faster to use a memcmp() type
-		const BYTE *pat = sig.bytes.data();
-		const BYTE *end = (input + inputLen);
+		const BYTE* pat = sig.bytes.data();
+		const BYTE* end = (input + inputLen);
 		const BYTE first = *pat;
 		size_t sigLen = sig.bytes.size();
 
@@ -229,16 +229,16 @@ PBYTE FindSignature(PBYTE input, size_t inputLen, const SIG &sig, BOOL hasWildca
 		{
 			if ((ptr[0] == first) && (ptr[lastIdx] == last))
 			{
-				if (memcmp(ptr+1, pat+1, sigLen-2) == 0)
+				if (memcmp(ptr + 1, pat + 1, sigLen - 2) == 0)
 					return ptr;
 			}
 		}
 	}
 	else
 	{
-		const BYTE *pat = sig.bytes.data();
-		const BYTE *msk = sig.mask.data();
-		const BYTE *end = (input + inputLen);
+		const BYTE* pat = sig.bytes.data();
+		const BYTE* msk = sig.mask.data();
+		const BYTE* end = (input + inputLen);
 		const BYTE first = *pat;
 		size_t sigLen = sig.bytes.size();
 		size_t lastIdx = (sigLen - 1);
@@ -248,12 +248,12 @@ PBYTE FindSignature(PBYTE input, size_t inputLen, const SIG &sig, BOOL hasWildca
 		{
 			if ((ptr[0] == first) && (ptr[lastIdx] == last))
 			{
-				const BYTE *patPtr = pat+1;
-				const BYTE *mskPtr = msk+1;
-				const BYTE *memPtr = ptr+1;
+				const BYTE* patPtr = pat + 1;
+				const BYTE* mskPtr = msk + 1;
+				const BYTE* memPtr = ptr + 1;
 				BOOL found = TRUE;
 
-				for (int i = 0; (i < sigLen-2) && (memPtr < end); ++mskPtr, ++patPtr, ++memPtr, i++)
+				for (int i = 0; (i < sigLen - 2) && (memPtr < end); ++mskPtr, ++patPtr, ++memPtr, i++)
 				{
 					if (!*mskPtr)
 						continue;
@@ -277,7 +277,7 @@ PBYTE FindSignature(PBYTE input, size_t inputLen, const SIG &sig, BOOL hasWildca
 // ------------------------------------------------------------------------------------------------
 
 // Reference version search
-static SSTATUS SearchSignature(PBYTE input, size_t inputLen, const SIG &sig)
+static SSTATUS SearchSignature(PBYTE input, size_t inputLen, const SIG& sig)
 {
 	size_t sigSize = sig.bytes.size();
 	size_t len = inputLen;
@@ -287,7 +287,7 @@ static SSTATUS SearchSignature(PBYTE input, size_t inputLen, const SIG &sig)
 	inputLen -= sigSize;
 
 	// Search for signature match..
-    PBYTE match = FindSignature(input, len, sig, hasWildcards);
+	PBYTE match = FindSignature(input, len, sig, hasWildcards);
 	while (match)
 	{
 		// Stop now if we've hit two matches
@@ -295,20 +295,20 @@ static SSTATUS SearchSignature(PBYTE input, size_t inputLen, const SIG &sig)
 			break;
 
 		++match;
-		len = (inputLen - (int) (match - input));
+		len = (inputLen - (int)(match - input));
 		if (len < sigSize)
 			break;
 
 		// Next search
-        match = FindSignature(match, len, sig, hasWildcards);
+		match = FindSignature(match, len, sig, hasWildcards);
 	};
 
 	SSTATUS status;
 	switch (count)
 	{
-		case 0: status = SSTATUS::NOT_FOUND; break;
-		case 1: status = SSTATUS::UNIQUE; break;
-		default: status = SSTATUS::NOT_UNIQUE; break;
+	case 0: status = SSTATUS::NOT_FOUND; break;
+	case 1: status = SSTATUS::UNIQUE; break;
+	default: status = SSTATUS::NOT_UNIQUE; break;
 	};
 
 	// Only happens when there is an error in the search algorithm during development/testing
@@ -317,14 +317,14 @@ static SSTATUS SearchSignature(PBYTE input, size_t inputLen, const SIG &sig)
 		msg("\n** " __FUNCTION__ ": Sig not found! **\n");
 		qstring tmp;
 		sig.ToIdaString(tmp);
-		msg("(%u) \"%s\"\n\n", (UINT32) sig.bytes.size(), tmp.c_str());
+		msg("(%u) \"%s\"\n\n", (UINT32)sig.bytes.size(), tmp.c_str());
 	}
 
 	return status;
 }
 
 // Fast AVX2 based search
-static SSTATUS SearchSignatureAVX2(PBYTE input, size_t inputLen, const SIG &sig)
+static SSTATUS SearchSignatureAVX2(PBYTE input, size_t inputLen, const SIG& sig)
 {
 	size_t sigSize = sig.bytes.size();
 	size_t len = inputLen;
@@ -340,7 +340,7 @@ static SSTATUS SearchSignatureAVX2(PBYTE input, size_t inputLen, const SIG &sig)
 			break;
 
 		++match;
-		len = (inputLen - (int) (match - input));
+		len = (inputLen - (int)(match - input));
 		if (len < sigSize)
 			break;
 
@@ -350,9 +350,9 @@ static SSTATUS SearchSignatureAVX2(PBYTE input, size_t inputLen, const SIG &sig)
 	SSTATUS status;
 	switch (count)
 	{
-		case 0: status = SSTATUS::NOT_FOUND; break;
-		case 1: status = SSTATUS::UNIQUE; break;
-		default: status = SSTATUS::NOT_UNIQUE; break;
+	case 0: status = SSTATUS::NOT_FOUND; break;
+	case 1: status = SSTATUS::UNIQUE; break;
+	default: status = SSTATUS::NOT_UNIQUE; break;
 	};
 
 	// Only happens when there is an error in the search algorithm during development/testing
@@ -361,25 +361,25 @@ static SSTATUS SearchSignatureAVX2(PBYTE input, size_t inputLen, const SIG &sig)
 		msg("\n** " __FUNCTION__ ": Sig not found! **\n");
 		qstring tmp;
 		sig.ToIdaString(tmp);
-		msg("(%u) \"%s\"\n\n", (UINT32) sig.bytes.size(), tmp.c_str());
+		msg("(%u) \"%s\"\n\n", (UINT32)sig.bytes.size(), tmp.c_str());
 	}
 	return status;
 }
 
 // Search for signature pattern, returning a status result
-SSTATUS SearchSignature(const SIG &sig)
+SSTATUS SearchSignature(const SIG& sig)
 {
 	// Setup IDB RAM clone on first scan
 	if (!searchData.CloneIdb())
 		return SSTATUS::NOT_FOUND;
 
-	#ifndef FORCE_REF_SEARCH
+#ifndef FORCE_REF_SEARCH
 	if (g_isAVX2Supported)
 		return SearchSignatureAVX2(searchData.buffer, searchData.size, sig);
 	else
-	#else
-	#pragma message(__LOC2__ "   ** Force use reference search switch on! **")
-	#endif
+#else
+#pragma message(__LOC2__ "   ** Force use reference search switch on! **")
+#endif
 	{
 		static BOOL warnOnce = TRUE;
 		if ((settings.outputLevel >= SETTINGS::LL_VERBOSE) && warnOnce)

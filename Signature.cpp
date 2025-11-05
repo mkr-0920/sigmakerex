@@ -12,21 +12,21 @@ struct SIGMATCH
 	SIG sig;
 	ea_t ea;
 	UINT32 size;
-    UINT32 wildcards;
+	UINT32 wildcards;
 
-	SIGMATCH(SIG &_sig, ea_t match_ea)
+	SIGMATCH(SIG& _sig, ea_t match_ea)
 	{
-        _sig.trim();
+		_sig.trim();
 		sig = _sig;
 		ea = match_ea;
-		size = (UINT32) _sig.bytes.size();
-        wildcards = (UINT32) _sig.wildcards();
+		size = (UINT32)_sig.bytes.size();
+		wildcards = (UINT32)_sig.wildcards();
 	}
 
-	bool operator <(const SIGMATCH &b) const
+	bool operator <(const SIGMATCH& b) const
 	{
 		//return size < b.size;
-        return std::pair(size, wildcards) < std::pair(b.size, b.wildcards);
+		return std::pair(size, wildcards) < std::pair(b.size, b.wildcards);
 	}
 };
 typedef std::list<SIGMATCH> UNIQUELIST;
@@ -36,15 +36,15 @@ typedef std::vector<SIG> SIGLETS;
 
 
 // Output signature to the IDA log pane
-void OutputSignature(const SIG &sig, ea_t address, UINT32 offset)
+void OutputSignature(const SIG& sig, ea_t address, UINT32 offset)
 {
 	if (offset == 0)
-		msg("SIG: 0x%llX, %u bytes %u, wildcards.\n", address, (UINT32) sig.bytes.size(), (UINT32) sig.wildcards());
+		msg("SIG: 0x%llX, %u bytes %u, wildcards.\n", address, (UINT32)sig.bytes.size(), (UINT32)sig.wildcards());
 	else
-		msg("SIG: 0x%llX, @ Offset: 0x%X, %u bytes, %u wildcards\n", address, offset, (UINT32) sig.bytes.size(), (UINT32) sig.wildcards());
+		msg("SIG: 0x%llX, @ Offset: 0x%X, %u bytes, %u wildcards\n", address, offset, (UINT32)sig.bytes.size(), (UINT32)sig.wildcards());
 
 	// Always output IDA format at minimal
-	qstring tmp;	
+	qstring tmp;
 	if (settings.outputFormat == SETTINGS::OF_IDA2)
 	{
 		sig.ToIdaString(tmp, TRUE);
@@ -57,40 +57,40 @@ void OutputSignature(const SIG &sig, ea_t address, UINT32 offset)
 	}
 
 	switch (settings.outputFormat)
-	{	
+	{
 		// Escape encoded binary with ASCII mask "code" style in two strings.
 		// E.g. "\x33\x9A\xFA\x00\x00\x00\x00\x45\x68", "xxxxxxx????xx"
-		case SETTINGS::OF_CODE:
-		{
-			qstring code;
-			sig.ToCodeString(code);
-			qstring mask;
-			sig.ToMaskString(mask);
-			tmp.sprnt("\"%s\", \"%s\"", code.c_str(), mask.c_str());
-			msg("%s\n", tmp.c_str());
-		}
-		break;
+	case SETTINGS::OF_CODE:
+	{
+		qstring code;
+		sig.ToCodeString(code);
+		qstring mask;
+		sig.ToMaskString(mask);
+		tmp.sprnt("\"%s\", \"%s\"", code.c_str(), mask.c_str());
+		msg("%s\n", tmp.c_str());
+	}
+	break;
 
-		// Like "code" style, but byte string with inlined wildcard bytes
-		// E.g. "\x33\x9A\xFA\xAD\xAD\xAD\xAD\x45\x68", where 0xAD is the wildcard bytes
-		case SETTINGS::OF_INLINE:
+	// Like "code" style, but byte string with inlined wildcard bytes
+	// E.g. "\x33\x9A\xFA\xAD\xAD\xAD\xAD\x45\x68", where 0xAD is the wildcard bytes
+	case SETTINGS::OF_INLINE:
+	{
+		qstring bytes;
+		sig.ToInlineString(bytes);
+		msg("\"%s\"\n", bytes.c_str());
+		qstring comment;
+		comment.sprnt("// \"%s\"\n", tmp.c_str());
+		tmp.sprnt("%s%s\n", comment.c_str(), bytes.c_str());
+		if (offset)
 		{
-			qstring bytes;
-			sig.ToInlineString(bytes);
-			msg("\"%s\"\n", bytes.c_str());
-			qstring comment;
-			comment.sprnt("// \"%s\"\n", tmp.c_str());
-			tmp.sprnt("%s%s\n", comment.c_str(), bytes.c_str());
-			if (offset)
-			{
-				qstring offstr;
-				offstr.sprnt("const UINT32 name_me_offset = 0x%X;", offset);
-				msg("\"%s\"\n", offstr.c_str());
-				tmp += offstr;
-			}
-			msg("\"const BYTE MASK_BYTE = 0x%X;\"\n", settings.maskByte);
+			qstring offstr;
+			offstr.sprnt("const UINT32 name_me_offset = 0x%X;", offset);
+			msg("\"%s\"\n", offstr.c_str());
+			tmp += offstr;
 		}
-		break;
+		msg("\"const BYTE MASK_BYTE = 0x%X;\"\n", settings.maskByte);
+	}
+	break;
 	};
 	WaitBox::processIdaEvents();
 
@@ -106,117 +106,215 @@ static inline BOOL isCall(UINT32 type) { return((type >= NN_call) && (type <= NN
 static inline BOOL IsIdbAddress(ea_t address) { return((address >= inf_get_min_ea()) && (address < inf_get_max_ea())); }  // Returns TRUE if address is inside this IDB
 
 // Return the instruction operand offset if it has one
-static UINT32 OperandOffset(__in insn_t &cmd)
+static UINT32 OperandOffset(__in insn_t& cmd)
 {
-    // For x86/AMD64 this will only a few max
-    for (UINT32 i = 0; i < UA_MAXOP; i++)
-    {
-        // Hit end of opcode entries?
+	// For x86/AMD64 this will only a few max
+	for (UINT32 i = 0; i < UA_MAXOP; i++)
+	{
+		// Hit end of opcode entries?
 		optype_t type = cmd.ops[i].type;
 		if ((type == o_void) || (type == (o_idpspec5 + 1)))
-            return 0;
-        else
-        // Has an operand value
-        if (cmd.ops[i].offb != 0)
-            return cmd.ops[i].offb;
-    }
-    return 0;
+			return 0;
+		else
+			// Has an operand value
+			if (cmd.ops[i].offb != 0)
+				return cmd.ops[i].offb;
+	}
+	return 0;
 }
 
 // Get largest value of the instruction operands be it a displacement or immediate value, etc., and considering the MSB/sign bit
-static ea_t LargestOperandValue(insn_t &cmd, ea_t test_ea)
+static ea_t LargestOperandValue(insn_t& cmd, ea_t test_ea)
 {
 	// IDA conveniently returns absolute addresses (not relative ones)
 
 	// TODO: For the sign assumptions here, could check for AWE aware flag (PE header flag IMAGE_FILE_LARGE_ADDRESS_AWARE) for 32bit targets
-    // Rare PE header flag for 32bit but a possibility still.   
+	// Rare PE header flag for 32bit but a possibility still.   
 	static ea_t HIGH_BIT = (inf_is_64bit() ? 0x8000000000000000 : 0x80000000);
 	ea_t result = 0;
 
-    for (UINT32 i = 0; i < UA_MAXOP; i++)
-    {
-        optype_t type = cmd.ops[i].type;
-        if ((type == o_void) || (type == (o_idpspec5 + 1)))
-            break;
-        else
-        {
-            ea_t value = (ea_t) cmd.ops[i].value;
-            //if ((value & HIGH_BIT) && (type == o_imm))
-            //    msg(EAFORMAT " v: %llX\n", test_ea, value);
+	for (UINT32 i = 0; i < UA_MAXOP; i++)
+	{
+		optype_t type = cmd.ops[i].type;
+		if ((type == o_void) || (type == (o_idpspec5 + 1)))
+			break;
+		else
+		{
+			ea_t value = (ea_t)cmd.ops[i].value;
+			//if ((value & HIGH_BIT) && (type == o_imm))
+			//    msg(EAFORMAT " v: %llX\n", test_ea, value);
 
-            // Ignore signed immediate value, assume it's a flag value that can be ignored
-            if (!((value & HIGH_BIT) && (type == o_imm)))
-                if (value > result)
-                    result = value;
+			// Ignore signed immediate value, assume it's a flag value that can be ignored
+			if (!((value & HIGH_BIT) && (type == o_imm)))
+				if (value > result)
+					result = value;
 
-            // Ignore signed displacements and memory references
-            ea_t adress = cmd.ops[i].addr;
-            if (!((adress & HIGH_BIT) && ((type == o_displ) || (type == o_mem))))
-                if (adress > result)
-                    result = adress;
+			// Ignore signed displacements and memory references
+			ea_t adress = cmd.ops[i].addr;
+			if (!((adress & HIGH_BIT) && ((type == o_displ) || (type == o_mem))))
+				if (adress > result)
+					result = adress;
 
-            //if (result & HIGH_BIT)
-            //    msg(EAFORMAT " %llX %llX t: %d\n", test_ea, value, adress, type);
-        }
-    }
+			//if (result & HIGH_BIT)
+			//    msg(EAFORMAT " %llX %llX t: %d\n", test_ea, value, adress, type);
+		}
+	}
 
-    return result;
+	return result;
 }
 
 // Decode an instruction into a sig container
-static void AddInst(__in_opt func_t *pfn, __in insn_t &cmd, __inout SIG &sig)
+// (这是 AddInst 函数的完整替换版本 - v5 - 采用部分通配)
+// (这个函数假定 IDA Pro 的字节是小端序(Little-Endian)存储的)
+
+// 解码一条指令并将其添加到 sig 容器
+static void AddInst(__in_opt func_t* pfn, __in insn_t& cmd, __inout SIG& sig)
 {
-    UINT32 offb = OperandOffset(cmd);
-    if (offb != 0)
-    {
-        // Filter out all call targets
-        BOOL filter = FALSE;
-        if (isCall(cmd.itype))
-            filter = TRUE;
-        else
-        // Check jump targets
-        if (isJmpCntl(cmd.itype) || isJmpNotCntl(cmd.itype))
-        {
-			// If we have function bounds, test for membership
+	// -----------------------------------------------------------------
+	// *** 1. 处理器平台检查 ***
+	// -----------------------------------------------------------------
+	static int s_proc_id = -1;
+	if (s_proc_id == -1)
+	{
+		s_proc_id = PH.id;
+	}
+
+	// -----------------------------------------------------------------
+	// *** 2. ARM / ARM64 逻辑 ***
+	// -----------------------------------------------------------------
+	if (s_proc_id == PLFM_ARM)
+	{
+		switch (cmd.itype)
+		{
+			// --- 2A. PC 相对指令 (ADRP/BL/B) ---
+			// 这些指令的编码太复杂, 立即数和操作码高度混合
+			//  safest policy is to wildcard all.
+		case ARM_adrp:
+		case ARM_adr:
+		case ARM_bl:
+		case ARM_b:
+			sig.AddWildcards(cmd.size);
+			return; // 完成
+
+			// --- 2B. LDR/STR (立即数偏移) ---
+			// LDR X1, [X19, #0x10]
+		case ARM_ldr:
+		case ARM_str:
+			if (cmd.Op2.type == o_displ)
+			{
+				// 策略: 立即数 (imm12) 污染了 Byte 1 和 Byte 2.
+				// 我们保留稳定的 Byte 0 (Rn[2:0] + Rt) 和 Byte 3 (Opcode)
+				// 内存顺序: [Byte 0] [Byte 1] [Byte 2] [Byte 3]
+
+				sig.AddBytes(cmd.ea, 1);      // 添加 Byte 0
+				sig.AddWildcards(2);          // 通配 Byte 1, 2
+				sig.AddBytes(cmd.ea + 3, 1);  // 添加 Byte 3
+				return; // 完成
+			}
+
+			if (cmd.Op2.type == o_mem) // LDR X1, =my_literal
+			{
+				// PC 相对字面量加载，也通配
+				sig.AddWildcards(cmd.size);
+				return; // 完成
+			}
+
+			// 否则 (例如 LDR X1, [X0, X2]),  fall-through 到 default
+			break;
+
+			// --- 2C. 立即数算术/移动/比较 ---
+			// ADD X1, X0, #0x80
+			// MOV X0, #0x10
+			// CMP X0, #0x1
+		case ARM_add:
+		case ARM_sub:
+		case ARM_mov:
+		case ARM_cmp:
+		case ARM_tst:
+			if (cmd.Op2.type == o_imm)
+			{
+				// 策略: 与 LDR/STR 相同, 立即数 (imm12) 污染了 Byte 1 和 Byte 2.
+				// 我们保留稳定的 Byte 0 (Rn/Rd) 和 Byte 3 (Opcode)
+
+				sig.AddBytes(cmd.ea, 1);      // 添加 Byte 0
+				sig.AddWildcards(2);          // 通配 Byte 1, 2
+				sig.AddBytes(cmd.ea + 3, 1);  // 添加 Byte 3
+				return; // 完成
+			}
+
+			// 否则 (例如 ADD X1, X0, X2), fall-through 到 default
+			break;
+		} // end switch
+
+		// --- 2D. 默认 ARM Case ---
+		// 所有其他指令 (例如 ADD X1, X0, X2) 都被认为是稳定的
+		sig.AddBytes(cmd.ea, cmd.size);
+		return; // 完成
+	} // end ARM logic
+
+
+	// -----------------------------------------------------------------
+	// *** 3. x86 / x64 逻辑 (保持 v4 的健壮逻辑) ***
+	// -----------------------------------------------------------------
+	UINT32 offb = OperandOffset(cmd);
+	if (offb != 0)
+	{
+		BOOL filter = FALSE;
+
+		// --- 3A. 总是通配 CALL 和 JMP ---
+		if (isCall(cmd.itype))
+			filter = TRUE;
+		else if (isJmpCntl(cmd.itype) || isJmpNotCntl(cmd.itype))
+		{
 			if (pfn)
 			{
-				// Filter if jump target is outside of our function
 				ea_t target_ea = LargestOperandValue(cmd, cmd.ea);
 				filter = !func_contains(pfn, target_ea);
 			}
 			else
-			// Else, keep short jumps and filter the rest
 			{
 				if (cmd.size != 2)
 					filter = TRUE;
 			}
-        }
-        else
-        {
-            // Filter intermediate values that are probably an address
-            if (ea_t value = LargestOperandValue(cmd, cmd.ea))
-                filter = IsIdbAddress(value);
-        }
+		}
+		else
+			// --- 3B. 检查所有其他指令 (o_imm, o_displ) ---
+		{
+			for (int i = 0; i < UA_MAXOP; i++)
+			{
+				optype_t type = cmd.ops[i].type;
+				if (type == o_void) break;
 
-        if (filter)
-        {
-            // Save the leading instruction bytes and wildcard the rest
-            sig.AddBytes(cmd.ea, offb);
-            sig.AddWildcards(cmd.size - offb);
-        }
-        else
-            sig.AddBytes(cmd.ea, cmd.size);
-    }
-    else
-		// No operand value
+				if (type == o_imm || type == o_displ || type == o_mem)
+				{
+					filter = TRUE;
+					break;
+				}
+			}
+		}
+
+		// --- 3C. 应用 x86 通配符 ---
+		if (filter)
+		{
+			sig.AddBytes(cmd.ea, offb);
+			sig.AddWildcards(cmd.size - offb);
+		}
+		else
+		{
+			sig.AddBytes(cmd.ea, cmd.size);
+		}
+	}
+	else
+	{
+		// 没有操作数 (PUSH, POP, RETN)
 		sig.AddBytes(cmd.ea, cmd.size);
+	}
 }
-
 
 // ------------------------------------------------------------------------------------------------
 
 // Dump a function's siglets for development
-static void DumpFuncSiglets(__in func_t *pfn, __in SIGLETS &siglets)
+static void DumpFuncSiglets(__in func_t* pfn, __in SIGLETS& siglets)
 {
 	qstring name;
 	get_func_name(&name, pfn->start_ea);
@@ -226,8 +324,8 @@ static void DumpFuncSiglets(__in func_t *pfn, __in SIGLETS &siglets)
 	size_t count = siglets.size();
 	for (size_t i = 0; i < count; i++)
 	{
-		SIG &siglet = siglets[i];
-		UINT32 size = (UINT32) siglet.bytes.size();
+		SIG& siglet = siglets[i];
+		UINT32 size = (UINT32)siglet.bytes.size();
 
 		msg("[%04u] %llX: ", i, current_ea);
 		qstring str;
@@ -244,12 +342,12 @@ static void DumpFuncSiglets(__in func_t *pfn, __in SIGLETS &siglets)
 
 // Decode instruction into a siglet
 // Returns instruction/alignment section on return, else <= 0 on error
-static int InstToSig(__in_opt func_t *pfn, ea_t current_ea, __out SIG &siglet)
+static int InstToSig(__in_opt func_t* pfn, ea_t current_ea, __out SIG& siglet)
 {
 	// Decode instruction at this address
 	insn_t cmd;
 	int decodeSize = decode_insn(&cmd, current_ea);
-	int itemSize = (int) get_item_size(current_ea);
+	int itemSize = (int)get_item_size(current_ea);
 	if (decodeSize <= 0)
 	{
 		// Decode failure
@@ -291,7 +389,7 @@ static int InstToSig(__in_opt func_t *pfn, ea_t current_ea, __out SIG &siglet)
 
 // Convert function instructions into an array of "siglets"
 // For disjointed chunk functions, only processes the first/entry chunk
-static BOOL FuncToSiglets(__in func_t *pfn, __out SIGLETS &siglets)
+static BOOL FuncToSiglets(__in func_t* pfn, __out SIGLETS& siglets)
 {
 	// Iterate function instructions
 	func_item_iterator_t fIt;
@@ -333,9 +431,9 @@ static BOOL FuncToSiglets(__in func_t *pfn, __out SIGLETS &siglets)
 }
 
 // Build a full function signature combined from a siglets array
-static void BuildFuncSig(__in const SIGLETS &siglets, __out SIG &sig)
+static void BuildFuncSig(__in const SIGLETS& siglets, __out SIG& sig)
 {
-	for (const SIG &siglet: siglets)
+	for (const SIG& siglet : siglets)
 		sig += siglet;
 
 	// Trim any right side wildcards to make signature smaller
@@ -343,7 +441,7 @@ static void BuildFuncSig(__in const SIGLETS &siglets, __out SIG &sig)
 }
 
 // Look for a unique sig at given function siglet boundary position
-static ea_t FindSigAtFuncAddress(ea_t current_ea, ea_t end_ea, size_t sigIndex, const SIGLETS &siglets, __out SIG &outsig)
+static ea_t FindSigAtFuncAddress(ea_t current_ea, ea_t end_ea, size_t sigIndex, const SIGLETS& siglets, __out SIG& outsig)
 {
 	/*
 	TODO: Currently sig candidates are generated from instruction boundary lengths.
@@ -353,13 +451,13 @@ static ea_t FindSigAtFuncAddress(ea_t current_ea, ea_t end_ea, size_t sigIndex, 
 	*/
 
 	// Expand our sig until we either find a unique one or we hit the end address
-    SIG sig;
+	SIG sig;
 	size_t sigByteSize = 0;
-    size_t sigletCount = siglets.size();
+	size_t sigletCount = siglets.size();
 
 	for (size_t i = sigIndex; i < sigletCount; i++)
 	{
-		const SIG &siglet = siglets[i];
+		const SIG& siglet = siglets[i];
 		sig += siglet;
 		size_t byteSize = siglet.bytes.size();
 		sigByteSize += byteSize;
@@ -387,26 +485,26 @@ static ea_t FindSigAtFuncAddress(ea_t current_ea, ea_t end_ea, size_t sigIndex, 
 						return current_ea;
 					}
 					else
-					// To cover a case that can only happen during development
-					if (status == SSTATUS::NOT_FOUND)
-						return BADADDR;
+						// To cover a case that can only happen during development
+						if (status == SSTATUS::NOT_FOUND)
+							return BADADDR;
 
 					WAIT_BOX_UPDATE();
 				}
 			}
 		}
 
-		current_ea += (ea_t) byteSize;
+		current_ea += (ea_t)byteSize;
 		if (current_ea >= end_ea)
 			break;
 	}
 
-    return BADADDR;
+	return BADADDR;
 }
 
 
 // Find minimal at instruction boundary, inside a function (already known to be unique), signature.
-static ea_t FindMinimalFuncSig(ea_t start_ea, ea_t end_ea, __in const SIGLETS &siglets, __out SIG &outsig)
+static ea_t FindMinimalFuncSig(ea_t start_ea, ea_t end_ea, __in const SIGLETS& siglets, __out SIG& outsig)
 {
 	// Walk through each siglet from the top down at instruction boundaries
 	UNIQUELIST canidates;
@@ -416,7 +514,7 @@ static ea_t FindMinimalFuncSig(ea_t start_ea, ea_t end_ea, __in const SIGLETS &s
 	for (size_t i = 0; i < count; i++)
 	{
 		// Try to find a unique sig at this address for siglet position
-		const SIG &siglet = siglets[i];
+		const SIG& siglet = siglets[i];
 		SIG sig;
 		ea_t result_ea = FindSigAtFuncAddress(current_ea, end_ea, i, siglets, sig);
 		if (result_ea != BADADDR)
@@ -433,7 +531,7 @@ static ea_t FindMinimalFuncSig(ea_t start_ea, ea_t end_ea, __in const SIGLETS &s
 			}
 		}
 
-		current_ea += (ea_t) siglet.bytes.size();
+		current_ea += (ea_t)siglet.bytes.size();
 	}
 
 	// Sport unique sig canidates by ascending primarily size, secondarily by 2nd wildcard count
@@ -442,7 +540,7 @@ static ea_t FindMinimalFuncSig(ea_t start_ea, ea_t end_ea, __in const SIGLETS &s
 	if (settings.outputLevel >= SETTINGS::LL_VERBOSE)
 	{
 		msg("\nUnique sig canidates: %u\n", (UINT32)canidates.size());
-		for (SIGMATCH &c: canidates)
+		for (SIGMATCH& c : canidates)
 		{
 			qstring str;
 			c.sig.ToIdaString(str);
@@ -458,25 +556,25 @@ static ea_t FindMinimalFuncSig(ea_t start_ea, ea_t end_ea, __in const SIGLETS &s
 
 // Find unique sig at function (already known to be unique) entry point downward
 // The size will be anywhere from MIN_SIG_SIZE to the entire function body size
-static ea_t FindFuncEntryPointSig(ea_t start_ea, __in SIG &funcSig, __out SIG &outsig)
+static ea_t FindFuncEntryPointSig(ea_t start_ea, __in SIG& funcSig, __out SIG& outsig)
 {
-    // Walk function sig down a byte at the time until we build a unique sig
-    funcSig.trim();
+	// Walk function sig down a byte at the time until we build a unique sig
+	funcSig.trim();
 	size_t sigSize = funcSig.bytes.size();
-    size_t sigByteSize = 0;
-    outsig.bytes.reserve(sigSize);
-    outsig.mask.reserve(sigSize);
+	size_t sigByteSize = 0;
+	outsig.bytes.reserve(sigSize);
+	outsig.mask.reserve(sigSize);
 
 	for (size_t i = 0; i < sigSize; i++)
 	{
 		// Append next byte from function sig
-        outsig.bytes.push_back(funcSig.bytes[i]);
-        outsig.mask.push_back(funcSig.mask[i]);
-        sigByteSize += 1;
+		outsig.bytes.push_back(funcSig.bytes[i]);
+		outsig.mask.push_back(funcSig.mask[i]);
+		sigByteSize += 1;
 
 		// If sig byte size is MIN_SIG_SIZE or greater check if the sig is unique
-        if (sigByteSize >= MIN_SIG_SIZE)
-        {
+		if (sigByteSize >= MIN_SIG_SIZE)
+		{
 			// Make a trimmed temp copy for further testing and faster scan speed
 			SIG tmp = outsig;
 			tmp.trim();
@@ -493,53 +591,53 @@ static ea_t FindFuncEntryPointSig(ea_t start_ea, __in SIG &funcSig, __out SIG &o
 					return start_ea;
 				}
 				else
-				// To cover a case that can only happen during development
-				if (status == SSTATUS::NOT_FOUND)
-					return BADADDR;
+					// To cover a case that can only happen during development
+					if (status == SSTATUS::NOT_FOUND)
+						return BADADDR;
 
 				WAIT_BOX_UPDATE();
 			}
-        }
+		}
 	}
 
-    return BADADDR;
+	return BADADDR;
 }
 
 // Find the optimal function (already known to be unique) signature based on user criteria setting
-ea_t FindFuncSig(__in const func_t *pfn, __in const SIGLETS &siglets, __in SIG &funcSig, __out SIG &outsig, UINT32 &offset)
+ea_t FindFuncSig(__in const func_t* pfn, __in const SIGLETS& siglets, __in SIG& funcSig, __out SIG& outsig, UINT32& offset)
 {
-    switch (settings.funcCriteria)
-    {
+	switch (settings.funcCriteria)
+	{
 		// Sig from function entry point downward
-        case SETTINGS::FUNC_ENTRY_POINT:
-		{
-			ea_t result_ea = FindFuncEntryPointSig(pfn->start_ea, funcSig, outsig);
-			offset = 0;
-			return result_ea;
-		}
-        break;
+	case SETTINGS::FUNC_ENTRY_POINT:
+	{
+		ea_t result_ea = FindFuncEntryPointSig(pfn->start_ea, funcSig, outsig);
+		offset = 0;
+		return result_ea;
+	}
+	break;
 
-		// Minimal optimal function sig
-		case SETTINGS::FUNC_MIN_SIZE:
-		{
-			ea_t result_ea = FindMinimalFuncSig(pfn->start_ea, pfn->end_ea, siglets, outsig);
-			offset = (UINT32) (result_ea - pfn->start_ea);
-			return result_ea;
-		}
-		break;
+	// Minimal optimal function sig
+	case SETTINGS::FUNC_MIN_SIZE:
+	{
+		ea_t result_ea = FindMinimalFuncSig(pfn->start_ea, pfn->end_ea, siglets, outsig);
+		offset = (UINT32)(result_ea - pfn->start_ea);
+		return result_ea;
+	}
+	break;
 
-		// Full function sig
-		case SETTINGS::FUNC_FULL:
-		{
-			funcSig.trim();
-            outsig = funcSig;
-			offset = 0;
-            return pfn->start_ea;
-		}
-		break;
-    };
+	// Full function sig
+	case SETTINGS::FUNC_FULL:
+	{
+		funcSig.trim();
+		outsig = funcSig;
+		offset = 0;
+		return pfn->start_ea;
+	}
+	break;
+	};
 
-    return BADADDR;
+	return BADADDR;
 }
 
 
@@ -547,7 +645,7 @@ ea_t FindFuncSig(__in const func_t *pfn, __in const SIGLETS &siglets, __in SIG &
 
 // Look for a unique function sig at given address
 // Returns base address of sig, or BADADDR on failure
-static ea_t FindSigAtFuncAddress(ea_t current_ea, __in func_t *pfn, __out SIG &outsig)
+static ea_t FindSigAtFuncAddress(ea_t current_ea, __in func_t* pfn, __out SIG& outsig)
 {
 	// Expand our sig until we either find a unique one or we hit the end address..
 	SIG sig;
@@ -562,7 +660,7 @@ static ea_t FindSigAtFuncAddress(ea_t current_ea, __in func_t *pfn, __out SIG &o
 			sig += siglet;
 		else
 			return BADADDR;
-		sigByteSize += (size_t) itemSize;
+		sigByteSize += (size_t)itemSize;
 
 		// If sig byte size is MIN_SIG_SIZE or larger check if the sig is unique
 		if (sigByteSize >= MIN_SIG_SIZE)
@@ -583,15 +681,15 @@ static ea_t FindSigAtFuncAddress(ea_t current_ea, __in func_t *pfn, __out SIG &o
 					return current_ea;
 				}
 				else
-				// To cover a case that can only happen during development
-				if (status == SSTATUS::NOT_FOUND)
-					return BADADDR;
+					// To cover a case that can only happen during development
+					if (status == SSTATUS::NOT_FOUND)
+						return BADADDR;
 
 				WAIT_BOX_UPDATE();
 			}
 		}
 
-		current_ea += (ea_t) itemSize;
+		current_ea += (ea_t)itemSize;
 		if (current_ea >= end_ea)
 			break;
 	}
@@ -599,9 +697,89 @@ static ea_t FindSigAtFuncAddress(ea_t current_ea, __in func_t *pfn, __out SIG &o
 	return BADADDR;
 }
 
+// (这是一个全新的函数，用于向上查找)
+// Look for a unique sig at given address, searching *upwards*
+// Returns base address of sig, or BADADDR on failure
+static ea_t FindSigAtAddress_Upwards(ea_t target_ea, __out SIG& outsig, __out UINT32& offset)
+{
+	SIG sig;
+	size_t sigByteSize = 0;
+	ea_t current_ea = target_ea; // Start at the address user clicked
+
+	while (TRUE)
+	{
+		// 1. 解码 *前一条* 指令
+		insn_t prev_cmd;
+		ea_t prev_ea = decode_prev_insn(&prev_cmd, current_ea);
+		if (prev_ea == BADADDR || prev_ea == current_ea)
+		{
+			LOG_VERBOSE(__FUNCTION__ ": 0x%llX could not find previous instruction.\n", current_ea);
+			break; // 无法再向上
+		}
+		current_ea = prev_ea; // 将光标移动到前一条指令的开头
+
+		// 2. 检查是否仍在代码区
+		flags64_t flags = get_flags_ex(current_ea, 0);
+		if (!is_code(flags))
+		{
+			LOG_VERBOSE(__FUNCTION__ ": 0x%llX no longer in a valid code space.\n", current_ea);
+			break;
+		}
+
+		// 3. 检查是否撞到了函数头
+		func_t* pfn = get_func(current_ea);
+		if (pfn && pfn->start_ea == current_ea)
+		{
+			LOG_VERBOSE(__FUNCTION__ ": 0x%llX walked into a function start.\n", current_ea);
+			break;
+		}
+
+		// 4. 将这条指令转换为 siglet (使用我们的 AddInst)
+		SIG siglet;
+		int itemSize = InstToSig(pfn, current_ea, siglet);
+		if (itemSize <= 0)
+			return BADADDR; // 解码失败
+
+		// 5. *** 核心逻辑: 在 *前面* 追加 ***
+		sig.Prepend(siglet);
+		sigByteSize += (size_t)itemSize;
+
+		// 6. 检查是否唯一
+		if (sigByteSize >= MIN_SIG_SIZE)
+		{
+			SIG tmp = sig;
+			tmp.trim();
+
+			if (tmp.bytes.size() >= MIN_SIG_SIZE)
+			{
+				SSTATUS status = SearchSignature(tmp);
+				if (status == SSTATUS::UNIQUE)
+				{
+					// 找到了!
+					outsig = tmp;
+
+					// *** 计算偏移 ***
+					// current_ea 是我们序列的 *起始地址* (低地址)
+					// target_ea 是用户点击的 *目标地址* (高地址)
+					offset = (UINT32)(target_ea - current_ea);
+
+					return current_ea; // 返回序列的起始地址
+				}
+				else
+					if (status == SSTATUS::NOT_FOUND)
+						return BADADDR;
+
+				WAIT_BOX_UPDATE();
+			}
+		}
+	}
+
+	return BADADDR;
+}
+
 // Look for a unique sig at given address; same as above sans function requirement
 // Returns base address of sig, or BADADDR on failure
-static ea_t FindSigAtAddress(ea_t current_ea, __out SIG &outsig)
+static ea_t FindSigAtAddress(ea_t current_ea, __out SIG& outsig)
 {
 	// Expand our sig until we either find a unique one, we run into a function, or we hit a non-address
 	SIG sig;
@@ -654,15 +832,15 @@ static ea_t FindSigAtAddress(ea_t current_ea, __out SIG &outsig)
 					return current_ea;
 				}
 				else
-				// To cover a case that can only happen during development
-				if (status == SSTATUS::NOT_FOUND)
-					return BADADDR;
+					// To cover a case that can only happen during development
+					if (status == SSTATUS::NOT_FOUND)
+						return BADADDR;
 
 				WAIT_BOX_UPDATE();
 			}
 		}
 
-		current_ea += (ea_t) itemSize;
+		current_ea += (ea_t)itemSize;
 	}
 
 	return BADADDR;
@@ -690,7 +868,7 @@ BOOL FindFuncXrefSig(ea_t func_ea)
 
 		while ((ref_ea != BADADDR) && (sigCount < refLimit))
 		{
-			func_t *pfn = get_func(ref_ea);
+			func_t* pfn = get_func(ref_ea);
 			if (pfn)
 			{
 				LOG_VERBOSE("[%u] Function ref @ 0x%llX, Func: 0x%llX\n", sigCount, ref_ea, pfn->start_ea);
@@ -729,8 +907,8 @@ BOOL FindFuncXrefSig(ea_t func_ea)
 
 			if (settings.outputLevel >= SETTINGS::LL_VERBOSE)
 			{
-				msg("\nXfef sig canidates: %u\n", (UINT32) canidates.size());
-				for (SIGMATCH &c: canidates)
+				msg("\nXfef sig canidates: %u\n", (UINT32)canidates.size());
+				for (SIGMATCH& c : canidates)
 				{
 					qstring str;
 					c.sig.ToIdaString(str);
@@ -756,64 +934,64 @@ BOOL FindFuncXrefSig(ea_t func_ea)
 // Attempt to create unique function signature at selected address
 void CreateFunctionSig()
 {
-    // User selected address
-    ea_t ea_selection = get_screen_ea();
-    if (ea_selection == BADADDR)
-    {
-        msg(MSG_TAG "* Select a function address first *\n");
-        return;
-    }
+	// User selected address
+	ea_t ea_selection = get_screen_ea();
+	if (ea_selection == BADADDR)
+	{
+		msg(MSG_TAG "* Select a function address first *\n");
+		return;
+	}
 
-    // Address must be at or inside a function
-    func_t *pfn = get_func(ea_selection);
+	// Address must be at or inside a function
+	func_t* pfn = get_func(ea_selection);
 	if (!pfn)
 	{
 		msg(MSG_TAG "* Select an address inside a code function *\n");
 		return;
 	}
 
-    // Convert function into a instruction "siglets" for analysis
+	// Convert function into a instruction "siglets" for analysis
 	msg("\n");
-    msg(MSG_TAG "Finding function signature.\n");
+	msg(MSG_TAG "Finding function signature.\n");
 	TIMESTAMP procStart = GetTimeStamp();
-    SIGLETS siglets;
-    if (FuncToSiglets(pfn, siglets))
-    {
+	SIGLETS siglets;
+	if (FuncToSiglets(pfn, siglets))
+	{
 		if (settings.outputLevel >= SETTINGS::LL_VERBOSE)
 		{
 			msg("\nFunction siglets:\n");
 			DumpFuncSiglets(pfn, siglets);
 		}
-    }
+	}
 
-    // Build a full function signature from the siglets
-    SIG funcSig;
-    BuildFuncSig(siglets, funcSig);
-    if (settings.outputLevel >= SETTINGS::LL_VERBOSE)
-    {
-        qstring sigStr;
-        funcSig.ToIdaString(sigStr);
-        msg("\nFull sig: \"%s\"\n\n", sigStr.c_str());
-    }
+	// Build a full function signature from the siglets
+	SIG funcSig;
+	BuildFuncSig(siglets, funcSig);
+	if (settings.outputLevel >= SETTINGS::LL_VERBOSE)
+	{
+		qstring sigStr;
+		funcSig.ToIdaString(sigStr);
+		msg("\nFull sig: \"%s\"\n\n", sigStr.c_str());
+	}
 	WaitBox::processIdaEvents();
 	WaitBox::show("SigMakerEx", "Working..");
 	WaitBox::updateAndCancelCheck(-1);
 
-    // Check if the function is unique first. If it's not, we won't find a unique sig within it
-    if (SearchSignature(funcSig) == SSTATUS::UNIQUE)
-    {
-        LOG_VERBOSE("Function is unique, finding optimal settings sig.\n");
+	// Check if the function is unique first. If it's not, we won't find a unique sig within it
+	if (SearchSignature(funcSig) == SSTATUS::UNIQUE)
+	{
+		LOG_VERBOSE("Function is unique, finding optimal settings sig.\n");
 
-        // Find an optimal sig for the unique function
-        SIG outsig;
+		// Find an optimal sig for the unique function
+		SIG outsig;
 		UINT32 offset = 0;
-        ea_t sig_ea = FindFuncSig(pfn, siglets, funcSig, outsig, offset);
+		ea_t sig_ea = FindFuncSig(pfn, siglets, funcSig, outsig, offset);
 		if (sig_ea != BADADDR)
 		{
 			// If entry point criteria is active, check optional max byte size
 			if (settings.funcCriteria == SETTINGS::FUNC_ENTRY_POINT)
 			{
-				if ((settings.maxEntryPointBytes != 0) && ((UINT32) outsig.bytes.size() > settings.maxEntryPointBytes))
+				if ((settings.maxEntryPointBytes != 0) && ((UINT32)outsig.bytes.size() > settings.maxEntryPointBytes))
 				{
 					LOG_VERBOSE("\nEntry point signature byte count exceeds configured max, looking for a reference function sig instead.\n");
 					if (!FindFuncXrefSig(pfn->start_ea))
@@ -825,18 +1003,18 @@ void CreateFunctionSig()
 			msg("Function ");
 			OutputSignature(outsig, sig_ea, offset);
 		}
-    }
+	}
 	else
-    // Not unique, look for a function reference signature instead
-    {
-        LOG_VERBOSE("\nFunction is not unique, looking for a reference function sig.\n");
+		// Not unique, look for a function reference signature instead
+	{
+		LOG_VERBOSE("\nFunction is not unique, looking for a reference function sig.\n");
 		if (!FindFuncXrefSig(pfn->start_ea))
 			msg(MSG_TAG "* Failed to find a base or reference signature for selected function. *\n");
-    }
+	}
 
-	exit:;
+exit:;
 	WaitBox::hide();
-    LOG_VERBOSE("Took %.3f seconds.\n", (GetTimeStamp() - procStart));
+	LOG_VERBOSE("Took %.3f seconds.\n", (GetTimeStamp() - procStart));
 	WaitBox::processIdaEvents();
 }
 
@@ -855,44 +1033,65 @@ void CreateAddressSig()
 	}
 
 	msg("\n");
-	msg(MSG_TAG "Finding signature for 0x%llX.\n", ea_selection);
 	WaitBox::show("SigMakerEx", "Working..");
 	WaitBox::updateAndCancelCheck(-1);
 	WaitBox::processIdaEvents();
 	TIMESTAMP procStart = GetTimeStamp();
 
-	// Ideally the address will be inside a function for better instruction analysis. Will typically
-	// be the case, but not a requirement here.
-	func_t *pfn = get_func(ea_selection);
-	if (pfn)
+	// *** 这是我们的新逻辑 ***
+	if (settings.searchDirection == 1) // 1 = Upwards
 	{
-		LOG_VERBOSE("Selected address 0x%llX is inside function 0x%llX\n", ea_selection, pfn->start_ea);
+		msg(MSG_TAG "Finding signature for 0x%llX (searching upwards).\n", ea_selection);
 
-		// Look for a minimal unique sig from address selection down
 		SIG sig;
-		ea_t sig_ea = FindSigAtFuncAddress(ea_selection, pfn, sig);
-		if (sig_ea != BADADDR)
+		UINT32 offset = 0; // 我们要获取的偏移
+		ea_t sig_start_ea = FindSigAtAddress_Upwards(ea_selection, sig, offset);
+
+		if (sig_start_ea != BADADDR)
 		{
-			msg("Address ");
-			OutputSignature(sig, ea_selection, 0);
+			// OutputSignature 已经支持偏移了!
+			msg("Address (Upwards) ");
+			OutputSignature(sig, sig_start_ea, offset);
 		}
 		else
-			msg(MSG_TAG "* Failed to find unique signature at address. *\n");
+			msg(MSG_TAG "* Failed to find unique signature at address (upwards). *\n");
 	}
-	else
+	else // 0 = Downwards (Default)
 	{
-		// The not inside a function version
-		LOG_VERBOSE("Selected address 0x%llX is NOT inside a function.", ea_selection);
+		// *** 这是您原来的旧逻辑 ***
+		msg(MSG_TAG "Finding signature for 0x%llX (searching downwards).\n", ea_selection);
 
-		SIG sig;
-		ea_t sig_ea = FindSigAtAddress(ea_selection, sig);
-		if (sig_ea != BADADDR)
+		func_t* pfn = get_func(ea_selection);
+		if (pfn)
 		{
-			msg("Address ");
-			OutputSignature(sig, ea_selection, 0);
+			LOG_VERBOSE("Selected address 0x%llX is inside function 0x%llX\n", ea_selection, pfn->start_ea);
+
+			// Look for a minimal unique sig from address selection down
+			SIG sig;
+			ea_t sig_ea = FindSigAtFuncAddress(ea_selection, pfn, sig);
+			if (sig_ea != BADADDR)
+			{
+				msg("Address ");
+				OutputSignature(sig, ea_selection, 0); // 偏移为 0
+			}
+			else
+				msg(MSG_TAG "* Failed to find unique signature at address. *\n");
 		}
 		else
-			msg(MSG_TAG "* Failed to find unique signature at address. *\n");
+		{
+			// The not inside a function version
+			LOG_VERBOSE("Selected address 0x%llX is NOT inside a function.", ea_selection);
+
+			SIG sig;
+			ea_t sig_ea = FindSigAtAddress(ea_selection, sig);
+			if (sig_ea != BADADDR)
+			{
+				msg("Address ");
+				OutputSignature(sig, ea_selection, 0); // 偏移为 0
+			}
+			else
+				msg(MSG_TAG "* Failed to find unique signature at address. *\n");
+		}
 	}
 
 	WaitBox::hide();
@@ -919,15 +1118,15 @@ void CreateAddressRangeSig()
 		WaitBox::processIdaEvents();
 		TIMESTAMP procStart = GetTimeStamp();
 
-        // Iterate instructions over range.
+		// Iterate instructions over range.
 		SIG sig;
 		func_item_iterator_t fIt;
 		bool isWithinRange = fIt.set_range(start_ea, end_ea);
 
-        do
-        {
-            // Add next instruction to signature
-            ea_t current_ea = fIt.current();
+		do
+		{
+			// Add next instruction to signature
+			ea_t current_ea = fIt.current();
 			SIG siglet;
 			int itemSize = InstToSig(get_func(current_ea), current_ea, siglet);
 			if (itemSize >= 1)
@@ -938,7 +1137,7 @@ void CreateAddressRangeSig()
 				return;
 			}
 
-        } while (fIt.next_not_tail());
+		} while (fIt.next_not_tail());
 
 		if (!sig.bytes.empty())
 		{

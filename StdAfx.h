@@ -22,6 +22,7 @@
 #pragma warning(disable:4018) // warning C4018: '<': signed/unsigned mismatch
 
 #include <ida.hpp>
+#include <idp.hpp>
 #include <bytes.hpp>
 #include <allins.hpp>
 #include <diskio.hpp>

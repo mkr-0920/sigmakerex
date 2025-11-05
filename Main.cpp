@@ -1,13 +1,13 @@
-ï»¿
+
 // Plugin main
 #include "SigMaker.h"
 
 // UI "actions"
 enum SIG_ACTION
 {
-	CREATE_FUNCTION_SIG,
-	CREATE_ADDRESS_SIG,
-	CREATE_RANGE_SIG
+    CREATE_FUNCTION_SIG,
+    CREATE_ADDRESS_SIG,
+    CREATE_RANGE_SIG
 };
 
 // Global settings instance
@@ -20,18 +20,20 @@ static void idaapi OnOptionButton(int button_code, form_actions_t& fa)
     {
         const char optionsDialog[] =
         {
-		    "SigMakerEx Options\n\n"
+            "SigMakerEx Options\n\n"
 
-		    // Output format dropdown
-		    "<#Signature output style.#Output format:b:0:100:>\n"
+            // Output format dropdown
+            "<#Signature output style.#Output format:b:0:100:>\n"
             // Mask byte for the inline wildcard style
             "<#Mask/wildcard byte for the \"inline\" BYTE output format.#Mask byte (0xAE default):N:0:4:>\n"
 
-		    // Function criteria dropdown
-		    "<#Function signature generation criteria option.#Function sigs:b:0:100:>\n"
+            // Function criteria dropdown
+            "<#Function signature generation criteria option.#Function sigs:b:0:100:>\n"
 
-		    // Output level dropdown
+            // Output level dropdown
             "<#IDA output message level.#Message level:b:0:100:>\n"
+
+            "<#\"At address\" search direction.#Search Direction:b:0:100:>\n"
 
             "<#Maximum function refs to scan when a function is not unique.#Max function scan refs (0 for unlimited):D:0:4:>\n"
             "<#Maximum function entry point signature bytes. When this limit is hit, will attempt to find a cross-ref signature instead.#Max function entry point signature bytes (0 for unlimited):D:0:4:>\n"
@@ -40,54 +42,58 @@ static void idaapi OnOptionButton(int button_code, form_actions_t& fa)
 
         settings.Validate();
 
-	    qstrvec_t outputFormatArray;
+        qstrvec_t outputFormatArray;
         outputFormatArray.push_back("IDA (Default)");
         outputFormatArray.push_back("IDA (With single '?' wildcards)");
         outputFormatArray.push_back("Code style");
         outputFormatArray.push_back("Inline byte");
 
-	    qstrvec_t funcCriteriaArray;
+        qstrvec_t funcCriteriaArray;
         funcCriteriaArray.push_back("Entry Point (Default)");
         funcCriteriaArray.push_back("Minimal byte size");
         funcCriteriaArray.push_back("Full function body");
 
-	    qstrvec_t outputLevelArray;
-	    outputLevelArray.push_back("Terse (Default)");
-	    outputLevelArray.push_back("Verbose");
+        qstrvec_t outputLevelArray;
+        outputLevelArray.push_back("Terse (Default)");
+        outputLevelArray.push_back("Verbose");
 
-        UINT64 maxRefCount64 = (UINT64) settings.maxScanRefCount;
-        UINT64 maxEntryPointBytes64 = (UINT64) settings.maxEntryPointBytes;
-        ea_t maskByteEa = (ea_t) settings.maskByte;
+        qstrvec_t searchDirectionArray;
+        searchDirectionArray.push_back("Downwards (Default)"); // Ñ¡Ïî 0
+        searchDirectionArray.push_back("Upwards");             // Ñ¡Ïî 1
 
-	    int result = ask_form(optionsDialog, &outputFormatArray,&settings.outputFormat, &maskByteEa, &funcCriteriaArray,&settings.funcCriteria, &outputLevelArray,&settings.outputLevel, &maxRefCount64, &maxEntryPointBytes64);
-	    if (result > 0)
-	    {
-            settings.maxScanRefCount = (UINT32) min(maxRefCount64, UINT_MAX);
-            settings.maxEntryPointBytes = (UINT32) min(maxEntryPointBytes64, UINT_MAX);
-            settings.maskByte = (BYTE) min(maskByteEa, 0xFF);
-		    settings.Save();
-	    }
+        UINT64 maxRefCount64 = (UINT64)settings.maxScanRefCount;
+        UINT64 maxEntryPointBytes64 = (UINT64)settings.maxEntryPointBytes;
+        ea_t maskByteEa = (ea_t)settings.maskByte;
+
+        int result = ask_form(optionsDialog, &outputFormatArray, &settings.outputFormat, &maskByteEa, &funcCriteriaArray, &settings.funcCriteria, &outputLevelArray, &settings.outputLevel, &searchDirectionArray, &settings.searchDirection, &maxRefCount64, &maxEntryPointBytes64);
+        if (result > 0)
+        {
+            settings.maxScanRefCount = (UINT32)min(maxRefCount64, UINT_MAX);
+            settings.maxEntryPointBytes = (UINT32)min(maxEntryPointBytes64, UINT_MAX);
+            settings.maskByte = (BYTE)min(maskByteEa, 0xFF);
+            settings.Save();
+        }
     }
-	catch (std::exception &ex)
-	{
-		msg(MSG_TAG "** C++ exception: OnOptionButton(): \"%s\" ***\n", ex.what());
-	}
-	catch (...)
-	{
-		msg(MSG_TAG "** Gerneral C exception: OnOptionButton() ***\n");
-	}
+    catch (std::exception& ex)
+    {
+        msg(MSG_TAG "** C++ exception: OnOptionButton(): \"%s\" ***\n", ex.what());
+    }
+    catch (...)
+    {
+        msg(MSG_TAG "** Gerneral C exception: OnOptionButton() ***\n");
+    }
 }
 
 static bool idaapi run(size_t arg)
 {
     // To facilitate passing action options via "plugins.cfg" hotkeys
-    WORD action = (WORD) arg;
+    WORD action = (WORD)arg;
     try
     {
         if (action == 0)
         {
             const char mainDialog[] =
-            {                
+            {
                 "STARTITEM 1\n"
                 "BUTTON YES* Continue\n"
 
@@ -137,9 +143,9 @@ static bool idaapi run(size_t arg)
                 "\"Max function scan refs\": Limit how many function cross references to search when a direct \"Function\" action signature can't be found.\n"
                 "Normally this should be '0' for unlimited search, but for problem cases where there are so many references that causes a slowdown, this can be set to some reasonable limit like 16 or 100.\n\n"
 
-				"\"Max function entry point signature bytes\": When using the \"Function\" option, and the \"Entry point\" criteria is configured, optionally limit the maximum entry point signature byte size. The default is '0', for unlimited (which can be up to the entire selected function body byte size).\n"
+                "\"Max function entry point signature bytes\": When using the \"Function\" option, and the \"Entry point\" criteria is configured, optionally limit the maximum entry point signature byte size. The default is '0', for unlimited (which can be up to the entire selected function body byte size).\n"
                 "If this limit is exceeded, an xref signature will be looked for instead.\n\n"
-				
+
                 "For the relatively rare case of functions that have their chunks spread over multiple address ranges, the tool will attempt to use just the first chunk.\n"
                 "If wishing to make a signature in one of the disjointed chunks, try using the \"At address\" method. If all else fails, try a \"From address range\" sig (might take some manual searching for uniqueness).\n"
 
@@ -183,33 +189,33 @@ static bool idaapi run(size_t arg)
         else
             action -= 1;
 
-        switch ((SIG_ACTION) action)
+        switch ((SIG_ACTION)action)
         {
             // Attempt to create an ideal function signature
-            case CREATE_FUNCTION_SIG:
+        case CREATE_FUNCTION_SIG:
             CreateFunctionSig();
             break;
 
             // Attempt to create a signature for a selected address
-            case CREATE_ADDRESS_SIG:
+        case CREATE_ADDRESS_SIG:
             CreateAddressSig();
             break;
 
             // Create a raw signature for a selected address range, unique or not
-            case CREATE_RANGE_SIG:
+        case CREATE_RANGE_SIG:
             CreateAddressRangeSig();
             break;
         };
     }
-	catch (std::exception &ex)
-	{
-		msg(MSG_TAG "** C++ exception: run(): \"%s\" ***\n", ex.what());
-	}
-	catch (...)
-	{
-		// Note: Need to set the /EHa to catch SEH exceptions too
-		msg(MSG_TAG "** Gerneral C exception: run() ***\n");
-	}
+    catch (std::exception& ex)
+    {
+        msg(MSG_TAG "** C++ exception: run(): \"%s\" ***\n", ex.what());
+    }
+    catch (...)
+    {
+        // Note: Need to set the /EHa to catch SEH exceptions too
+        msg(MSG_TAG "** Gerneral C exception: run() ***\n");
+    }
     return true;
 }
 
